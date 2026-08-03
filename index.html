@@ -70,12 +70,33 @@
   #detail ol .stop.kamp{background:#fdf3e7;border-left:3px solid #d97706;padding:2px 8px;border-radius:0 6px 6px 0;display:inline-block}
   #detail ol .ktag{font-size:11px;color:#92400e;font-style:italic;margin-left:3px}
   #detail ol .cn{color:#9099a3}
+  .landenrow{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin:2px 0 10px;font-size:12.5px}
+  .landenrow .lc{white-space:nowrap}
+  .landenrow .arr{color:#9099a3}
   #detail a{color:var(--accent)}
+  .plfilter{width:100%;padding:7px 9px;font-size:13px;border:1px solid var(--line);border-radius:8px;outline:none;margin-bottom:8px}
+  .plfilter:focus{border-color:var(--accent)}
+  .pllist{max-height:340px;overflow-y:auto;margin:0 -4px}
+  .plrow{padding:6px 8px;border-radius:6px;cursor:pointer;border-bottom:1px solid #f1f3f5}
+  .plrow:hover{background:#eef7fa}
+  .plrow .pln{font-size:13px}
+  .plrow .plmeta{font-size:11px;color:var(--muted)}
   .badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:20px;color:#fff;margin-top:2px}
   /* zoek */
   #searchwrap{padding:12px 16px 4px;position:relative}
   #search{width:100%;padding:8px 10px;font-size:13px;border:1px solid var(--line);border-radius:8px;outline:none}
   #search:focus{border-color:var(--accent)}
+  #search.glow{border-color:var(--accent);animation:searchpulse 1.8s ease-in-out infinite}
+  @keyframes searchpulse{0%,100%{box-shadow:0 0 0 0 rgba(14,116,144,.28)}50%{box-shadow:0 0 0 5px rgba(14,116,144,0)}}
+  /* modus-schakelaar */
+  .modes{display:flex;gap:2px;margin:0 16px 12px;background:#eef1f4;border-radius:9px;padding:3px}
+  .modes button{flex:1;border:none;background:none;font-size:13px;padding:7px 8px;border-radius:7px;cursor:pointer;color:var(--muted);font-weight:500}
+  .modes button.on{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+  /* start-hint */
+  .starthint{font-size:12.5px;color:var(--muted);line-height:1.5;padding:2px 2px 4px}
+  .starthint b{color:var(--ink)}
+  .starthint .all{display:inline-block;margin-top:8px;color:var(--accent);font-weight:600;cursor:pointer}
+  .starthint .all:hover{text-decoration:underline}
   #results{position:absolute;left:16px;right:16px;top:46px;background:#fff;border:1px solid var(--line);
     border-radius:8px;box-shadow:0 8px 20px rgba(0,0,0,.14);z-index:1200;max-height:260px;overflow:auto;display:none}
   #results .r{padding:7px 10px;font-size:13px;cursor:pointer;border-bottom:1px solid #f1f3f5}
@@ -128,11 +149,13 @@
       <div class="sub">1940–1945 · verzetsdeelnemers op weg naar Engeland</div></div>
   </div>
   <div id="count"></div>
+  <div class="modes" id="modes"><button data-mode="routes" class="on">Routes</button><button data-mode="heat">Warmtekaart</button></div>
   <div id="searchwrap">
     <input id="search" type="text" placeholder="Zoek een persoon op naam…" autocomplete="off">
     <div id="results"></div>
   </div>
   <div class="scroll">
+    <div class="starthint" id="starthint">Zoek hierboven een <b>persoon</b>, of klik hieronder een <b>route</b> aan om reizen te tonen.<br><span class="all" id="showall">Toon alle reizen →</span></div>
     <div class="grp">
       <h2 class="ch">Hoofdroute<span class="chev">▾</span></h2>
       <div class="gbody" id="legend"></div>
@@ -173,6 +196,7 @@
 </div></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script>
 const ROUTE_COLORS = {
   "Noordelijke route":"#2f6fb0", "Zuidelijke route":"#d67a2e",
@@ -207,21 +231,27 @@ let map = L.map('map',{preferCanvas:true,minZoom:3,zoomControl:false,worldCopyJu
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',{
   attribution:'© OpenStreetMap © CARTO · data: Nationaal Archief',
   subdomains:'abcd',maxZoom:12}).addTo(map);
+// labels-laag (boven de heatmap; alleen in warmtekaart-modus getoond)
+map.createPane('labels'); map.getPane('labels').style.zIndex=620; map.getPane('labels').style.pointerEvents='none';
+const labelsLayer=L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',{
+  subdomains:'abcd',maxZoom:12,pane:'labels'});
 
-const renderer = L.canvas({padding:.5});
+const renderer = L.canvas({padding:.5, tolerance:8});  // ruimere klik-tolerantie voor dunne lijnen
 let PEOPLE=[], GEO={}, LINES=[];
-const state={solo:null,yearMin:1940,yearMax:1945,showDetail:true,showDashed:true,q:""};
-let animLayer=null, animTimer=null;
+const state={solo:null,yearMin:1940,yearMax:1945,showDetail:true,showDashed:true,q:"",blank:true,focusId:null,mode:'routes'};
+let animLayer=null, animTimer=null, heatLayer=null, HEAT_N=0, locMarker=null;
+function interact(){ state.blank=false; state.focusId=null; const s=document.getElementById('search'); if(s)s.classList.remove('glow'); }
 
 Promise.all([
-  fetch('people.json?v=3').then(r=>r.json()),
-  fetch('geocache.json?v=3').then(r=>r.json())
+  fetch('people.json?v=4').then(r=>r.json()),
+  fetch('geocache.json?v=4').then(r=>r.json())
 ]).then(([people,geo])=>{
   PEOPLE=people; GEO=geo;
-  buildLegend(); buildLines(); wire(); apply();
+  buildLegend(); buildLines(); buildHeat(); wire(); apply();
   let nd=0,nh=0; LINES.forEach(l=>l._dashed?nh++:nd++);
   document.getElementById('nDetail').textContent=nd;
   document.getElementById('nDashed').textContent=nh;
+  document.getElementById('search').classList.add('glow');   // nodig het zoeken uit
   const qp=new URLSearchParams(location.search);
   if(qp.get('id')) setTimeout(()=>gotoPerson(qp.get('id')),200);
 });
@@ -239,11 +269,11 @@ function animateRoute(id){
   animLayer=L.layerGroup().addTo(map);
   const col=ROUTE_COLORS[p.hoofdroute]||"#6b7280";
   try{ map.fitBounds(L.latLngBounds(pts.map(x=>x.c)),{paddingTopLeft:[360,30],paddingBottomRight:[330,30]}); }catch(e){}
-  const line=L.polyline([pts[0].c],{color:'#0e7490',weight:3,opacity:.95}).addTo(animLayer);
+  const line=L.polyline([pts[0].c],{renderer,color:'#0e7490',weight:3,opacity:.95,interactive:false}).addTo(animLayer);
   const fixed=[pts[0].c]; let prevDot=null;
   const dropDot=pt=>{
     if(prevDot){ prevDot.setStyle({radius:4,fillColor:col,fillOpacity:.8,weight:1}); prevDot.closeTooltip(); }
-    const d=L.circleMarker(pt.c,{radius:7,color:'#fff',weight:2,fillColor:'#0e7490',fillOpacity:1}).addTo(animLayer);
+    const d=L.circleMarker(pt.c,{renderer,radius:7,color:'#fff',weight:2,fillColor:'#0e7490',fillOpacity:1,interactive:false}).addTo(animLayer);
     d.bindTooltip(`${esc(pt.place)}${pt.camp?' · '+esc(pt.camp):''}`,{permanent:true,direction:'top',className:'animlabel'}).openTooltip();
     prevDot=d;
   };
@@ -290,6 +320,21 @@ function buildLines(){
   }
 }
 
+let HEAT_PLACES=[];
+function buildHeat(){
+  const agg={};
+  for(const p of PEOPLE){ if(!p.heeft_route) continue;
+    for(const s of p.route){ const c=coordOf(s.key); if(!c) continue; const k=s.key;
+      if(!agg[k]) agg[k]={c,n:0,place:s.place,country:s.country,ids:[],_seen:{}};
+      agg[k].n++; if(!agg[k]._seen[p.id]){agg[k]._seen[p.id]=1; agg[k].ids.push(p.id);} } }
+  const vals=Object.values(agg); HEAT_N=vals.length;
+  HEAT_PLACES=vals.slice().sort((a,b)=>b.n-a.n);
+  if(typeof L.heatLayer!=='function') return;   // heat-plugin niet geladen
+  const max=Math.max(1,...vals.map(a=>a.n));
+  const data=vals.map(a=>[a.c[0],a.c[1], 0.25+0.75*(a.n/max)]);   // intensiteit ~ hoe vaak genoemd
+  heatLayer=L.heatLayer(data,{radius:20,blur:16,maxZoom:8,minOpacity:.3,
+    gradient:{0.2:'#2f6fb0',0.45:'#1f9e8f',0.65:'#eab308',0.82:'#d67a2e',1:'#b91c1c'}});
+}
 function buildLegend(){
   const el=document.getElementById('legend');
   const counts={}; for(const p of PEOPLE) counts[p.hoofdroute]=(counts[p.hoofdroute]||0)+1;
@@ -297,7 +342,7 @@ function buildLegend(){
     if(!counts[name]) continue;
     const d=document.createElement('div'); d.className='leg'; d.dataset.route=name;
     d.innerHTML=`<span class="sw" style="background:${col}"></span><span>${name}</span><span class="n">${counts[name]}</span>`;
-    d.onclick=()=>{ state.solo=(state.solo===name)?null:name; syncLegend(); apply(); };
+    d.onclick=()=>{ const wasSolo=state.solo===name && !state.blank; interact(); state.solo=wasSolo?null:name; syncLegend(); apply(); };
     el.appendChild(d);
   }
 }
@@ -310,7 +355,8 @@ function syncLegend(){
 }
 function wire(){
   const lo=document.getElementById('yearMin'), hi=document.getElementById('yearMax');
-  function years(){
+  function years(e){
+    if(e) interact();
     let a=+lo.value, b=+hi.value;
     if(a>b){ if(this===lo) b=a, hi.value=a; else a=b, lo.value=b; }
     state.yearMin=a; state.yearMax=b;
@@ -320,14 +366,30 @@ function wire(){
     document.getElementById('yfill').style.right=((1945-b)/span*100)+'%';
     apply();
   }
-  lo.oninput=years; hi.oninput=years; years.call(lo);
-  document.getElementById('ckDetail').onchange=e=>{state.showDetail=e.target.checked;apply();};
-  document.getElementById('ckDashed').onchange=e=>{state.showDashed=e.target.checked;apply();};
+  lo.oninput=function(e){years.call(lo,e);}; hi.oninput=function(e){years.call(hi,e);}; years();
+  document.getElementById('ckDetail').onchange=e=>{interact();state.showDetail=e.target.checked;apply();};
+  document.getElementById('ckDashed').onchange=e=>{interact();state.showDashed=e.target.checked;apply();};
+  // modus-schakelaar Routes / Warmtekaart
+  document.querySelectorAll('#modes button').forEach(b=>b.onclick=()=>{
+    state.mode=b.dataset.mode; document.querySelectorAll('#modes button').forEach(x=>x.classList.toggle('on',x===b));
+    document.querySelector('.scroll').style.display = state.mode==='heat'?'none':'';
+    const sb=document.getElementById('search');
+    sb.value=''; state.q=''; document.getElementById('results').style.display='none';
+    sb.placeholder = state.mode==='heat' ? 'Zoek een plaats op de kaart…' : 'Zoek een persoon op naam…';
+    if(locMarker){ map.removeLayer(locMarker); locMarker=null; }
+    if(state.mode==='heat') labelsLayer.addTo(map); else map.removeLayer(labelsLayer);
+    document.getElementById('detail').style.display='none';
+    apply();
+  });
+  // "Toon alle reizen"
+  document.getElementById('showall').onclick=()=>{ interact(); state.solo=null; syncLegend(); apply(); };
   // inklapbare secties
   document.querySelectorAll('.grp h2.ch').forEach(h=>h.onclick=()=>h.parentElement.classList.toggle('collapsed'));
   const s=document.getElementById('search');
-  s.oninput=()=>{state.q=s.value.trim().toLowerCase(); showResults(); apply();};
-  s.onfocus=()=>{ if(state.q) showResults(); };
+  s.oninput=()=>{ state.q=s.value.trim().toLowerCase();
+    if(state.mode==='heat'){ showLocResults(); }
+    else { if(state.q) interact(); showResults(); apply(); } };
+  s.onfocus=()=>{ s.classList.remove('glow'); if(state.q){ state.mode==='heat'?showLocResults():showResults(); } };
   document.addEventListener('click',e=>{ if(!e.target.closest('#searchwrap')) document.getElementById('results').style.display='none'; });
 }
 function showResults(){
@@ -342,32 +404,91 @@ function showResults(){
   box.style.display='block';
   box.querySelectorAll('.r').forEach(el=>el.onclick=()=>gotoPerson(el.dataset.id));
 }
+function showLocResults(){
+  const box=document.getElementById('results');
+  if(!state.q){ box.style.display='none'; return; }
+  const hits=HEAT_PLACES.filter(a=>a.place.toLowerCase().includes(state.q)).slice(0,10);
+  if(!hits.length){ box.innerHTML='<div class="empty">Geen plaats gevonden.</div>'; box.style.display='block'; return; }
+  box.innerHTML=hits.map((a,i)=>`<div class="r" data-loc="${i}"><div>${esc(a.place)}${a.country?` <span style="color:#9099a3">(${esc(a.country)})</span>`:''}</div><div class="meta">${a.n}× genoemd</div></div>`).join('');
+  box.style.display='block';
+  box.querySelectorAll('.r').forEach(el=>el.onclick=()=>gotoPlace(hits[+el.dataset.loc]));
+}
+function gotoPlace(a){
+  document.getElementById('results').style.display='none';
+  if(locMarker) map.removeLayer(locMarker);
+  locMarker=L.circleMarker(a.c,{renderer,radius:9,color:'#fff',weight:2,fillColor:'#b91c1c',fillOpacity:.95,interactive:false})
+    .addTo(map).bindTooltip(`<b>${esc(a.place)}</b><br>${a.n}× genoemd`,{className:'evtip',direction:'top',permanent:true,offset:[0,-6]}).openTooltip();
+  map.setView(a.c, 7, {animate:true});
+  showPlaceList(a);
+}
+function showPlaceList(a){
+  const byId={}; PEOPLE.forEach(p=>byId[p.id]=p);
+  const people=(a.ids||[]).map(id=>byId[id]).filter(Boolean).sort((x,y)=>x.naam.localeCompare(y.naam,'nl'));
+  document.querySelector('#detail .dh').innerHTML=
+    `<span class="close" onclick="hideDetail()">×</span><b>${esc(a.place)}</b>${a.country?` ${flag(a.country)}`:''}<br>
+     <span class="badge" style="background:var(--accent)">${a.n}× aangedaan · ${people.length} personen</span>`;
+  document.querySelector('#detail .db').innerHTML=
+    `<h3>Engelandvaarders via deze plaats</h3>`+
+    (people.length>8?`<input id="plfilter" class="plfilter" placeholder="Filter op naam…" autocomplete="off">`:``)+
+    `<div class="pllist" id="pllist">`+people.map(p=>
+      `<div class="plrow" data-id="${esc(p.id)}"><div class="pln">${esc(p.naam)}</div><div class="plmeta">${esc([p.geboortejaar,p.hoofdroute].filter(Boolean).join(' · '))}</div></div>`).join('')+`</div>`;
+  document.getElementById('detail').style.display='block';
+  document.querySelectorAll('#pllist .plrow').forEach(el=>el.onclick=()=>gotoPerson(el.dataset.id));
+  const f=document.getElementById('plfilter');
+  if(f) f.oninput=()=>{ const q=f.value.toLowerCase();
+    document.querySelectorAll('#pllist .plrow').forEach(el=>{ el.style.display=el.querySelector('.pln').textContent.toLowerCase().includes(q)?'':'none'; }); };
+}
 function gotoPerson(id){
   const line=LINES.find(l=>l._p.id===id);
   const p=(line&&line._p)||PEOPLE.find(x=>x.id===id);
   document.getElementById('results').style.display='none';
-  if(line){ if(!map.hasLayer(line)) line.addTo(map); try{map.fitBounds(line.getBounds().pad(0.25));}catch(e){} }
+  state.blank=false; state.focusId=id; state.mode='routes';
+  const sb=document.getElementById('search'); sb.classList.remove('glow'); sb.value=''; state.q=''; sb.placeholder='Zoek een persoon op naam…';
+  document.querySelectorAll('#modes button').forEach(x=>x.classList.toggle('on',x.dataset.mode==='routes'));
+  document.querySelector('.scroll').style.display='';
+  map.removeLayer(labelsLayer);
+  if(locMarker){ map.removeLayer(locMarker); locMarker=null; }
+  apply();
+  if(line){ try{map.fitBounds(line.getBounds().pad(0.25));}catch(e){} }
   if(p) showDetail(p);
 }
 function apply(){
+  const heat=state.mode==='heat';
+  const sh=document.getElementById('starthint'); if(sh) sh.style.display=(!heat && state.blank && !state.focusId)?'block':'none';
   let shown=0;
   for(const line of LINES){
-    const p=line._p; let ok=true;
-    if(state.solo && p.hoofdroute!==state.solo) ok=false;
-    if(ok && line._year && (line._year<state.yearMin || line._year>state.yearMax)) ok=false;
-    if(ok && state.q && !p.naam.toLowerCase().includes(state.q)) ok=false;
-    if(ok && line._dashed && !state.showDashed) ok=false;
-    if(ok && !line._dashed && !state.showDetail) ok=false;
+    const p=line._p; let ok;
+    if(heat) ok=false;
+    else if(state.focusId) ok=(p.id===state.focusId);
+    else if(state.blank) ok=false;
+    else {
+      ok=true;
+      if(state.solo && p.hoofdroute!==state.solo) ok=false;
+      if(ok && line._year && (line._year<state.yearMin||line._year>state.yearMax)) ok=false;
+      if(ok && state.q && !p.naam.toLowerCase().includes(state.q)) ok=false;
+      if(ok && line._dashed && !state.showDashed) ok=false;
+      if(ok && !line._dashed && !state.showDetail) ok=false;
+    }
     if(ok){ if(!map.hasLayer(line)) line.addTo(map); shown++; }
     else if(map.hasLayer(line)) map.removeLayer(line);
   }
-  document.getElementById('count').innerHTML=`<b>${shown.toLocaleString('nl')}</b><span>van ${PEOPLE.length.toLocaleString('nl')} reizen zichtbaar</span>`;
+  if(heat){ if(heatLayer && !map.hasLayer(heatLayer)) heatLayer.addTo(map); }
+  else if(heatLayer && map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
+  const c=document.getElementById('count');
+  if(heat) c.innerHTML=`<b>${HEAT_N.toLocaleString('nl')}</b><span>genoemde plaatsen op de route</span>`;
+  else if(state.blank && !state.focusId) c.innerHTML=`<b>${PEOPLE.length.toLocaleString('nl')}</b><span>reizen — kies wat je toont</span>`;
+  else c.innerHTML=`<b>${shown.toLocaleString('nl')}</b><span>van ${PEOPLE.length.toLocaleString('nl')} reizen zichtbaar</span>`;
 }
 function esc(s){return (s||"").replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 function nlDate(s){ const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s||""); return m?`${+m[3]}-${+m[2]}-${m[1]}`:(s||""); }
 function godsLabel(g){ if(!g) return g; if(g.toLowerCase().trim()==='geen') return 'onbekend';
   return g.replace(/Israeliet/g,'Israëliet').replace(/\(Joods\)/g,'(joods)'); }
 function archiefNr(url){ const m=/\/archief\/([\d.]+)\//.exec(url||""); return m?m[1]:""; }
+function reisDagen(a,b){ if(!/^\d{4}-\d{2}-\d{2}$/.test(a||'')||!/^\d{4}-\d{2}-\d{2}$/.test(b||'')) return '';
+  const d=Math.round((new Date(b)-new Date(a))/864e5); if(d<0||d>3000) return '';
+  if(d===0) return 'zelfde dag'; if(d===1) return '1 dag';
+  let x=''; if(d>=365) x=` (~${Math.round(d/365*10)/10} jaar)`.replace('.',','); else if(d>=60) x=` (~${Math.round(d/30)} mnd)`;
+  return `${d} dagen${x}`; }
 function showDetail(p){
   clearAnim();
   const col=ROUTE_COLORS[p.hoofdroute]||"#8a8f98";
@@ -386,19 +507,20 @@ function showDetail(p){
   } else {
     stops=`<div style="color:#6b7280;font-style:italic">Geen gedetailleerde route in het archief; getoond als herkomstlijn van ${esc(p.land_vertrek||'?')} naar het Verenigd Koninkrijk.</div>`;
   }
-  const landenHtml=(p.landen_op_route||'').split(' - ').map(l=>l.trim()).filter(Boolean)
-    .map(l=>`${flag(l)} ${esc(l)}`.trim()).join(' <span style="color:#9099a3">→</span> ');
-  const landenKv=p.landen_op_route?`<div class="kv"><span class="k">Landen</span><span>${landenHtml}</span></div>`:"";
+  let landenArr=(p.landen_op_route||'').split(' - ').map(l=>l.trim()).filter(Boolean);
+  landenArr=landenArr.filter((l,i)=>i===0||l!==landenArr[i-1]);   // opeenvolgende dubbelen samenvoegen
+  const landenHtml=landenArr.map(l=>`<span class="lc">${flag(l)} ${esc(l)}</span>`.trim()).join('<span class="arr">→</span>');
+  const landenKv=landenArr.length?`<div class="landenrow">${landenHtml}</div>`:"";
   const playBtn=(p.heeft_route&&latlngsOf(p).length>=2)
     ?`<button class="animbtn" onclick="animateRoute('${p.id}')">▶ Reis afspelen</button>`:"";
   document.querySelector('#detail .db').innerHTML=
     playBtn+
     `<h3>Personalia</h3>`+
-    kv("Geboren", [p.geboortejaar,p.geboorteplaats].filter(Boolean).join(", "))+
+    kv("Geboortejaar", p.geboortejaar)+ kv("Geboorteplaats", p.geboorteplaats)+
     kv("Woonplaats", p.woonplaats)+ kv("Beroep", p.beroep)+ kv("Godsdienst", godsLabel(p.godsdienst))+
     `<h3>Reis</h3>`+
     kv("Vertrek", [p.land_vertrek,nlDate(p.datumvertr)].filter(Boolean).join(", "))+
-    kv("Aankomst", nlDate(p.datumaank))+
+    kv("Aankomst", nlDate(p.datumaank))+ kv("Reisduur", reisDagen(p.datumvertr,p.datumaank))+
     `<h3>Route</h3>`+ landenKv + stops+
     `<h3>Bron</h3>`+
     (p.record_link?`<div><a href="${esc(p.record_link)}" target="_blank" rel="noopener">Bekijk het record in het Nationaal Archief →</a></div>`:"")+
@@ -406,7 +528,12 @@ function showDetail(p){
     (p.link?`<div style="margin-top:6px"><a href="${esc(p.link)}" target="_blank" rel="noopener" style="font-size:12px;color:var(--muted)">Meer op Oorlogsbronnen.nl →</a></div>`:"");
   document.getElementById('detail').style.display='block';
 }
-function hideDetail(){clearAnim();document.getElementById('detail').style.display='none';}
+function hideDetail(){
+  clearAnim();
+  document.getElementById('detail').style.display='none';
+  if(state.focusId){ state.focusId=null; if(!state.solo && !state.q) state.blank=true; }
+  apply();
+}
 // welkomstoverlay
 function closeWelcome(){
   if(document.getElementById('wdismiss').checked){try{localStorage.setItem('ev_welcome','1');}catch(e){}}

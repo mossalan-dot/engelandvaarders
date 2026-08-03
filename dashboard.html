@@ -55,7 +55,7 @@
   .yseg{width:100%}
   .ycap{font-size:12px;color:var(--muted);margin-top:7px;font-variant-numeric:tabular-nums;text-align:center}
   .ycap b{display:block;color:var(--ink);font-size:13px}
-  .yearchart.months{gap:2px;overflow-x:auto}
+  .yearchart.months{gap:2px;overflow-x:auto;padding-left:18px;padding-right:8px}
   .yearchart.months .ystack{max-width:none;border-radius:2px 2px 0 0}
   .yearchart.months .ycol{min-width:9px}
   .ycap.mth{font-size:10px;min-height:15px}
@@ -63,6 +63,8 @@
   .legend span{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
   .legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
   .note{font-size:12px;color:var(--muted);margin-top:14px}
+  .vnote{font-size:12.5px;color:#4b5563;line-height:1.55;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+  .vnote b{color:var(--ink)}
   /* kaartkop met toggle */
   .cardhead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
   .cardhead h2{margin:0}.cardhead .sub{margin:2px 0 0}
@@ -149,15 +151,20 @@
     <div class="card w8">
       <div class="cardhead"><div><h2>Vertrek in de tijd</h2><div class="sub">aantal vertrekken, gestapeld naar hoofdroute — klik de legenda om routes te tonen/verbergen</div></div>
         <div class="toggle" id="vtoggle"><button data-m="jaar" class="on">Per jaar</button><button data-m="maand">Per maand</button></div></div>
-      <div class="yearchart" id="yearchart"></div><div class="legend" id="ylegend"></div></div>
+      <div class="yearchart" id="yearchart"></div><div class="legend" id="ylegend"></div>
+      <div class="vnote">De grootste golf valt in het <b>voorjaar en de zomer van 1943</b>: na de Duitse maatregelen van april 1943 — de loyaliteitsverklaring voor studenten, het opnieuw in krijgsgevangenschap voeren van oud-militairen en de uitbreiding van de arbeidsinzet — sloegen veel jonge mannen op de vlucht. Een eerdere, kleinere piek is <b>mei 1940</b>, direct na de Duitse inval, met overtochten over de Noordzee. In de wintermaanden lag het aantal vertrekken telkens lager.</div></div>
     <div class="card w4"><h2>Hoofdroute</h2><div class="sub">welke weg naar Engeland</div><div class="bars" id="routechart"></div></div>
     <div class="card w6"><h2>Land van vertrek</h2><div class="sub">vanwaar de reis begon</div><div class="bars" id="landchart"></div></div>
+    <div class="card w6">
+      <div class="cardhead"><div><h2 id="herktitel">Herkomst — steden</h2><div class="sub" id="herksub">top 15 · woonplaats bij vertrek</div></div>
+        <div class="toggle" id="htoggle"><button data-m="stad" class="on">Stad</button><button data-m="prov">Provincie</button></div></div>
+      <div class="bars" id="herkchart"></div></div>
     <div class="card w6"><h2>Leeftijd bij vertrek</h2><div class="sub">per leeftijdsjaar, berekend uit geboorte- en vertrekjaar</div><div class="vchart" id="leeftijdchart"></div></div>
     <div class="card w6"><h2>Meest genoemde beroepen <span class="qmark" data-tip="Militaire rangen (luitenant, sergeant, marinier, adelborst, cadet, …) zijn samengevoegd tot ‘militair’. Koopvaardij en visserij blijven apart.">?</span></h2><div class="sub">top 15 · beroep bij vertrek</div><div class="bars" id="beroepchart"></div></div>
     <div class="card w6"><h2>Godsdienst</h2><div class="sub">opgegeven geloof, samengevoegd</div><div class="bars" id="godschart"></div></div>
     <div class="card w6"><h2>Reisduur</h2><div class="sub">tijd tussen vertrek en aankomst in Engeland</div><div class="bars" id="duurchart"></div></div>
     <div class="card w6">
-      <div class="cardhead"><div><h2 id="plaatstitel">Meest aangedane plaatsen</h2><div class="sub" id="plaatssub">top 20 · uit de gedetailleerde routes</div></div>
+      <div class="cardhead"><div><h2><span id="plaatstitel">Meest aangedane plaatsen</span> <span class="qmark" data-tip="Gebaseerd op de reizen met een gedetailleerde route in het archief (ca. 1.158). Reizen die alleen als herkomstlijn bekend zijn, tellen hier niet mee.">?</span></h2><div class="sub" id="plaatssub">top 20 · uit de gedetailleerde routes</div></div>
         <div class="toggle" id="ptoggle"><button data-m="plaats" class="on">Plaatsen</button><button data-m="land">Landen</button></div></div>
       <div class="bars" id="plaatschart"></div></div>
   </div>
@@ -170,10 +177,11 @@ const RC={"Noordelijke route":"var(--noord)","Zuidelijke route":"var(--zuid)",
  "Zuidelijke route, via Zwitserland":"var(--zwits)","Noordzee":"var(--zee)",
  "Oostelijke route":"var(--oost)","overig":"var(--overig)","onbekend":"var(--onbekend)"};
 const ROUTE_ORDER=Object.keys(RC);
+const PALETTE=['#0e7490','#2f6fb0','#8156b8','#1f9e8f','#d67a2e','#4f9d4f','#be123c','#0891b2','#7c3aed','#b45309','#0d9488','#6366f1'];
 const cap=s=>s?s.charAt(0).toUpperCase()+s.slice(1):s;
 const esc=s=>(s||"").replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 
-fetch('people.json?v=3').then(r=>r.json()).then(build);
+fetch('people.json?v=4').then(r=>r.json()).then(build);
 
 function build(P){
   DATA=P;
@@ -224,7 +232,7 @@ function build(P){
   let gE=Object.entries(gc).sort((a,b)=>b[1].n-a[1].n);
   const onb=gE.filter(([k])=>k==='onbekend'); gE=gE.filter(([k])=>k!=='onbekend');
   const gtop=gE.slice(0,9).concat(onb).map(([k,v])=>{
-    const col=k==='onbekend'?'var(--muted)':'var(--accent)';
+    const col=k==='onbekend'?'var(--muted)':undefined;
     const note=/isra/.test(k)?"Israëliet — de destijds gangbare aanduiding voor het joodse geloof.":null;
     return [v.label, v.n, col, note];});
   bars('godschart', gtop, P.filter(p=>p.godsdienst).length);
@@ -236,7 +244,48 @@ function build(P){
   bars('duurchart', dbins.map(([lab,lo,hi])=>[lab, durs.filter(x=>x>=lo&&x<hi).length, 'var(--accent)']), durs.length, true);
 
   setupPlaats(P, metroute);
+  setupHerkomst(P);
   bindTips();
+}
+const PROV={
+ amsterdam:'Noord-Holland',haarlem:'Noord-Holland',heemstede:'Noord-Holland',bussum:'Noord-Holland',naarden:'Noord-Holland',hilversum:'Noord-Holland',ijmuiden:'Noord-Holland',velsen:'Noord-Holland',beverwijk:'Noord-Holland',santpoort:'Noord-Holland',zaandam:'Noord-Holland',alkmaar:'Noord-Holland',hoorn:'Noord-Holland',bloemendaal:'Noord-Holland',laren:'Noord-Holland',huizen:'Noord-Holland',weesp:'Noord-Holland',zandvoort:'Noord-Holland','den helder':'Noord-Holland',
+ 'den haag':'Zuid-Holland',"'s-gravenhage":'Zuid-Holland',scheveningen:'Zuid-Holland',rotterdam:'Zuid-Holland',delft:'Zuid-Holland',leiden:'Zuid-Holland',dordrecht:'Zuid-Holland',vlaardingen:'Zuid-Holland',schiedam:'Zuid-Holland',wassenaar:'Zuid-Holland',voorburg:'Zuid-Holland',rijswijk:'Zuid-Holland',katwijk:'Zuid-Holland','katwijk aan zee':'Zuid-Holland',oegstgeest:'Zuid-Holland',gouda:'Zuid-Holland',gorinchem:'Zuid-Holland',voorschoten:'Zuid-Holland',maassluis:'Zuid-Holland',noordwijk:'Zuid-Holland',hillegom:'Zuid-Holland',
+ utrecht:'Utrecht',amersfoort:'Utrecht',zeist:'Utrecht',baarn:'Utrecht',bilthoven:'Utrecht',soest:'Utrecht',driebergen:'Utrecht',doorn:'Utrecht',veenendaal:'Utrecht',
+ groningen:'Groningen',delfzijl:'Groningen',winschoten:'Groningen',appingedam:'Groningen',
+ arnhem:'Gelderland',nijmegen:'Gelderland',apeldoorn:'Gelderland',ede:'Gelderland',wageningen:'Gelderland',zutphen:'Gelderland',harderwijk:'Gelderland',doetinchem:'Gelderland',
+ enschede:'Overijssel',hengelo:'Overijssel',deventer:'Overijssel',zwolle:'Overijssel',almelo:'Overijssel',kampen:'Overijssel',
+ breda:'Noord-Brabant',eindhoven:'Noord-Brabant',tilburg:'Noord-Brabant',"'s-hertogenbosch":'Noord-Brabant','den bosch':'Noord-Brabant',helmond:'Noord-Brabant','bergen op zoom':'Noord-Brabant',roosendaal:'Noord-Brabant',
+ maastricht:'Limburg',heerlen:'Limburg',venlo:'Limburg',roermond:'Limburg',sittard:'Limburg',
+ vlissingen:'Zeeland',middelburg:'Zeeland',goes:'Zeeland',terneuzen:'Zeeland',
+ leeuwarden:'Friesland',sneek:'Friesland',harlingen:'Friesland',drachten:'Friesland',
+ assen:'Drenthe',emmen:'Drenthe',meppel:'Drenthe',hoogeveen:'Drenthe'
+};
+function provinceOf(wp){
+  if(!wp) return '';
+  const m=/\(([^)]+)\)/.exec(wp);
+  if(m){ const c=m[1].toLowerCase(); if(c.includes('belg'))return 'België'; if(c.includes('frank'))return 'Frankrijk'; if(c.includes('duits'))return 'Duitsland'; return 'buitenland'; }
+  return PROV[wp.toLowerCase().trim()]||'overig / onbekend';
+}
+let hMode='stad';
+function setupHerkomst(P){
+  document.querySelectorAll('#htoggle button').forEach(b=>b.onclick=()=>{ hMode=b.dataset.m;
+    document.querySelectorAll('#htoggle button').forEach(x=>x.classList.toggle('on',x===b)); drawHerkomst(P); });
+  drawHerkomst(P);
+}
+function drawHerkomst(P){
+  const denom=P.filter(p=>p.woonplaats && p.woonplaats.trim()).length;
+  document.getElementById('herktitel').textContent = hMode==='stad'?'Herkomst — steden':'Herkomst — provincies';
+  document.getElementById('herksub').textContent = hMode==='stad'?'top 15 · woonplaats bij vertrek':'woonplaats naar provincie';
+  if(hMode==='stad'){
+    const c={}; P.forEach(p=>{ const w=(p.woonplaats||'').trim(); if(w)c[w]=(c[w]||0)+1; });
+    bars('herkchart', topN(c,15), denom);
+  } else {
+    const c={}; P.forEach(p=>{ const pr=provinceOf(p.woonplaats); if(pr)c[pr]=(c[pr]||0)+1; });
+    let e=Object.entries(c).sort((a,b)=>b[1]-a[1]);
+    const tail=e.filter(([k])=>k==='overig / onbekend'||k==='buitenland');
+    e=e.filter(([k])=>k!=='overig / onbekend'&&k!=='buitenland');
+    bars('herkchart', e.concat(tail), denom);
+  }
 }
 let DATA=[];
 function isMilitair(t){
@@ -247,7 +296,7 @@ function vbars(id, rows){
   const max=Math.max(1,...rows.map(r=>r[1]));
   document.getElementById(id).innerHTML=rows.map(([lab,n,xl,tip])=>{
     const tt=(tip||`<b>${esc(String(lab))}</b><br>${n}`).replace(/"/g,'&quot;');
-    return `<div class="vbar" data-tip="${tt}"><div class="vfill" style="height:${n/max*100}%"></div>
+    return `<div class="vbar" data-tip="${tt}"><div class="vfill" style="height:${n/max*100}%;${n?'':'min-height:0'}"></div>
       <div class="vlab${xl?'':' blank'}">${esc(xl||'.')}</div></div>`;}).join('');
 }
 // Vertrek in de tijd (jaar/maand + route-toggle)
@@ -391,13 +440,13 @@ function kpi(items){ document.getElementById('kpis').innerHTML=items.map(([v,l,s
   `<div class="kpi">${tip?`<span class="q" data-tip="${esc(tip).replace(/"/g,'&quot;')}">?</span>`:''}<div class="v">${v}</div><div class="l">${l}</div>${s?`<div class="s">${s}</div>`:''}</div>`).join(''); }
 function bars(id, rows, denom, showPct){
   const max=Math.max(1,...rows.map(r=>r[1]));
-  document.getElementById(id).innerHTML=rows.map(r=>{
+  document.getElementById(id).innerHTML=rows.map((r,i)=>{
     const [lab,n,col,note]=r; const w=n/max*100;
     const val=showPct?`${pct(n,denom)}`:n.toLocaleString('nl');
     let tip=`<b>${esc(lab)}</b><br>${n.toLocaleString('nl')} · ${pct(n,denom)}`;
     if(note) tip+=`<br><span style="opacity:.85">${esc(note)}</span>`;
     return `<div class="bar" data-tip="${tip.replace(/"/g,'&quot;')}"><span class="lab">${esc(lab)}</span>
-      <span class="track"><span class="fill" style="width:${w}%;background:${col||'var(--accent)'}"></span></span>
+      <span class="track"><span class="fill" style="width:${w}%;background:${col||PALETTE[i%PALETTE.length]}"></span></span>
       <span class="val">${val}</span></div>`;
   }).join('');
 }
