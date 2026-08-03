@@ -59,7 +59,10 @@
   #detail .dh{padding:14px 16px 10px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
   #detail .dh b{font-size:15px}
   #detail .close{position:absolute;top:10px;right:12px;cursor:pointer;color:var(--muted);font-size:18px;line-height:1}
-  #detail .db{padding:12px 16px;font-size:13px}
+  #detail .db{padding:12px 16px 16px;font-size:13px}
+  #detail .db h3{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;
+    margin:15px 0 7px;padding-top:13px;border-top:1px solid var(--line)}
+  #detail .db h3:first-child{margin-top:0;padding-top:0;border-top:none}
   #detail .kv{display:flex;gap:8px;padding:3px 0}
   #detail .kv .k{color:var(--muted);width:92px;flex:none}
   #detail ol{margin:8px 0 0;padding-left:18px;font-size:12.5px;line-height:1.6}
@@ -91,7 +94,7 @@
     border:2px solid var(--accent);cursor:pointer}
   .dual input::-webkit-slider-runnable-track{background:none}
   /* reis-animatie */
-  .animbtn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer}
+  .animbtn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:9px;padding:10px 14px;font-size:13.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px}
   .animbtn:hover{background:var(--accent-dark)}
   .leaflet-tooltip.animlabel{background:#1f2937;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;padding:3px 8px;box-shadow:0 2px 8px rgba(0,0,0,.35)}
   .leaflet-tooltip.animlabel.leaflet-tooltip-top:before{border-top-color:#1f2937}
@@ -120,7 +123,7 @@
 <div id="map"></div>
 <aside id="side">
   <div class="shead">
-    <div class="icon">🧭</div>
+    <div class="icon">⛵</div>
     <div><h1>Reizen van de Engelandvaarders</h1>
       <div class="sub">1940–1945 · verzetsdeelnemers op weg naar Engeland</div></div>
   </div>
@@ -157,13 +160,13 @@
 </aside>
 <div id="detail"><span class="close" onclick="hideDetail()">×</span><div class="dh"></div><div class="db"></div></div>
 <div id="welcome"><div class="box">
-  <div class="wicon">🧭</div>
+  <div class="wicon">⛵</div>
   <h2>Reizen van de Engelandvaarders</h2>
   <p>Ruim 2.100 Nederlandse verzetsdeelnemers wisten tussen 1940 en 1945 Engeland te bereiken. Elke lijn is één reis, uit de index Engelandvaarders 1940–1945 van het Nationaal Archief.</p>
   <ul>
     <li><b>Filter</b> links op hoofdroute, vertrekjaar en weergave.</li>
     <li><b>Zoek</b> een persoon op naam en spring naar zijn of haar route.</li>
-    <li>Klik op een <b>lijn</b> voor het reisverloop en de links naar de recordpagina en scan in het Nationaal Archief.</li>
+    <li>Klik op een <b>lijn</b> voor het reisverloop en de links naar de recordpagina en scan bij het Nationaal Archief.</li>
   </ul>
   <div class="wf"><label><input type="checkbox" id="wdismiss"> niet meer tonen</label>
     <button onclick="closeWelcome()">Kaart verkennen →</button></div>
@@ -200,8 +203,8 @@ function flag(country){
   return FLAGS[c]||"";
 }
 
-let map = L.map('map',{preferCanvas:true,minZoom:2,zoomControl:false}).setView([52,4],4);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
+let map = L.map('map',{preferCanvas:true,minZoom:3,zoomControl:false,worldCopyJump:true}).setView([52,7],4.5);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',{
   attribution:'© OpenStreetMap © CARTO · data: Nationaal Archief',
   subdomains:'abcd',maxZoom:12}).addTo(map);
 
@@ -226,26 +229,43 @@ Promise.all([
 function coordOf(key){ const g=key&&GEO[key]; return g?[g.lat,g.lon]:null; }
 function latlngsOf(p){ const out=[]; if(p.heeft_route){ for(const s of p.route){ const c=coordOf(s.key);
   if(c) out.push({c,place:s.place,country:s.country,camp:s.camp}); } } return out; }
-function clearAnim(){ if(animTimer){clearInterval(animTimer);animTimer=null;} if(animLayer){map.removeLayer(animLayer);animLayer=null;} }
+function clearAnim(){ if(animTimer){clearInterval(animTimer);animTimer=null;}
+  if(animLayer){ map.removeLayer(animLayer); animLayer=null; apply(); } }  // apply() zet de andere reizen terug
 function animateRoute(id){
   const p=PEOPLE.find(x=>x.id===id); if(!p) return;
   const pts=latlngsOf(p); if(pts.length<2) return;
   clearAnim();
+  LINES.forEach(l=>{ if(map.hasLayer(l)) map.removeLayer(l); });   // verberg alle andere reizen
   animLayer=L.layerGroup().addTo(map);
   const col=ROUTE_COLORS[p.hoofdroute]||"#6b7280";
-  try{ map.fitBounds(L.latLngBounds(pts.map(x=>x.c)).pad(0.2)); }catch(e){}
-  const line=L.polyline([],{color:'#0e7490',weight:3,opacity:.95}).addTo(animLayer);
-  let prevDot=null,i=0;
-  animTimer=setInterval(()=>{
-    if(i>=pts.length){ clearInterval(animTimer); animTimer=null;
-      if(prevDot){prevDot.setStyle({radius:5,fillColor:col,fillOpacity:1,weight:1.5});}
-      line.setStyle({color:col,opacity:.85}); return; }
-    const pt=pts[i]; line.addLatLng(pt.c);
+  try{ map.fitBounds(L.latLngBounds(pts.map(x=>x.c)),{paddingTopLeft:[360,30],paddingBottomRight:[330,30]}); }catch(e){}
+  const line=L.polyline([pts[0].c],{color:'#0e7490',weight:3,opacity:.95}).addTo(animLayer);
+  const fixed=[pts[0].c]; let prevDot=null;
+  const dropDot=pt=>{
     if(prevDot){ prevDot.setStyle({radius:4,fillColor:col,fillOpacity:.8,weight:1}); prevDot.closeTooltip(); }
-    const dot=L.circleMarker(pt.c,{radius:7,color:'#fff',weight:2,fillColor:'#0e7490',fillOpacity:1}).addTo(animLayer);
-    dot.bindTooltip(`${esc(pt.place)}${pt.camp?' · '+esc(pt.camp):''}`,{permanent:true,direction:'top',className:'animlabel'}).openTooltip();
-    prevDot=dot; i++;
-  },850);
+    const d=L.circleMarker(pt.c,{radius:7,color:'#fff',weight:2,fillColor:'#0e7490',fillOpacity:1}).addTo(animLayer);
+    d.bindTooltip(`${esc(pt.place)}${pt.camp?' · '+esc(pt.camp):''}`,{permanent:true,direction:'top',className:'animlabel'}).openTooltip();
+    prevDot=d;
+  };
+  dropDot(pts[0]);
+  const segDur=Math.max(300,Math.min(900,9000/(pts.length-1)));
+  const start=Date.now(); let lastDot=0;
+  animTimer=setInterval(()=>{
+    const prog=(Date.now()-start)/segDur;          // voortgang in segmenten (tijd-gebaseerd)
+    let seg=Math.floor(prog);
+    if(seg>=pts.length-1){                          // klaar
+      line.setLatLngs(pts.map(x=>x.c));
+      while(lastDot<pts.length-1){ lastDot++; dropDot(pts[lastDot]); }
+      clearInterval(animTimer); animTimer=null;
+      if(prevDot) prevDot.setStyle({radius:5,fillColor:col,fillOpacity:1,weight:1.5});
+      line.setStyle({color:col,opacity:.85}); return;
+    }
+    const t=prog-seg, A=pts[seg].c, B=pts[seg+1].c;
+    const path=pts.slice(0,seg+1).map(x=>x.c);
+    path.push([A[0]+(B[0]-A[0])*t, A[1]+(B[1]-A[1])*t]);   // vloeiend groeiende rand
+    line.setLatLngs(path);
+    while(lastDot<seg){ lastDot++; dropDot(pts[lastDot]); }
+  },30);
 }
 
 function buildLines(){
@@ -369,14 +389,19 @@ function showDetail(p){
   const landenHtml=(p.landen_op_route||'').split(' - ').map(l=>l.trim()).filter(Boolean)
     .map(l=>`${flag(l)} ${esc(l)}`.trim()).join(' <span style="color:#9099a3">→</span> ');
   const landenKv=p.landen_op_route?`<div class="kv"><span class="k">Landen</span><span>${landenHtml}</span></div>`:"";
+  const playBtn=(p.heeft_route&&latlngsOf(p).length>=2)
+    ?`<button class="animbtn" onclick="animateRoute('${p.id}')">▶ Reis afspelen</button>`:"";
   document.querySelector('#detail .db').innerHTML=
+    playBtn+
+    `<h3>Personalia</h3>`+
     kv("Geboren", [p.geboortejaar,p.geboorteplaats].filter(Boolean).join(", "))+
-    kv("Woonplaats", p.woonplaats)+ kv("Beroep", p.beroep)+
-    kv("Godsdienst", godsLabel(p.godsdienst))+ kv("Vertrek", [p.land_vertrek,nlDate(p.datumvertr)].filter(Boolean).join(", "))+
-    kv("Aankomst", nlDate(p.datumaank))+ landenKv+
-    `<div class="grp" style="margin-top:10px"><h2>Reisverloop</h2>${stops}</div>`+
-    (p.heeft_route&&latlngsOf(p).length>=2?`<div style="margin-top:12px"><button class="animbtn" onclick="animateRoute('${p.id}')">▶ Reis afspelen</button></div>`:"")+
-    (p.record_link?`<div style="margin-top:12px"><a href="${esc(p.record_link)}" target="_blank" rel="noopener">Bekijk het record in het Nationaal Archief →</a></div>`:"")+
+    kv("Woonplaats", p.woonplaats)+ kv("Beroep", p.beroep)+ kv("Godsdienst", godsLabel(p.godsdienst))+
+    `<h3>Reis</h3>`+
+    kv("Vertrek", [p.land_vertrek,nlDate(p.datumvertr)].filter(Boolean).join(", "))+
+    kv("Aankomst", nlDate(p.datumaank))+
+    `<h3>Route</h3>`+ landenKv + stops+
+    `<h3>Bron</h3>`+
+    (p.record_link?`<div><a href="${esc(p.record_link)}" target="_blank" rel="noopener">Bekijk het record in het Nationaal Archief →</a></div>`:"")+
     (p.na_link?`<div style="margin-top:6px"><a href="${esc(p.na_link)}" target="_blank" rel="noopener" style="font-size:12px;color:var(--muted)">Scan van het dossier${archiefNr(p.na_link)?` (${archiefNr(p.na_link)})`:''} →</a></div>`:"")+
     (p.link?`<div style="margin-top:6px"><a href="${esc(p.link)}" target="_blank" rel="noopener" style="font-size:12px;color:var(--muted)">Meer op Oorlogsbronnen.nl →</a></div>`:"");
   document.getElementById('detail').style.display='block';

@@ -71,9 +71,9 @@
   .toggle button.on{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.12)}
   /* verticale staafgrafiek (leeftijd / per maand) */
   .vchart{display:flex;align-items:flex-end;gap:3px;height:210px;overflow-x:auto;padding:6px 2px 0}
-  .vbar{flex:1 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+  .vbar{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
   .vbar .vfill{width:100%;background:var(--accent);border-radius:3px 3px 0 0;min-height:1px}
-  .vbar .vlab{font-size:9.5px;color:var(--muted);margin-top:5px;white-space:nowrap}
+  .vbar .vlab{font-size:9.5px;color:var(--muted);margin-top:5px;white-space:nowrap;overflow:visible}
   .vbar .vlab.blank{visibility:hidden}
   /* klikbare legenda */
   .legend span{cursor:pointer;user-select:none}
@@ -82,6 +82,8 @@
   .kpi{position:relative}
   .kpi .q{position:absolute;top:12px;right:14px;width:16px;height:16px;border-radius:50%;background:#eef1f4;
     color:var(--muted);font-size:11px;text-align:center;line-height:16px;cursor:default;font-weight:600}
+  .qmark{display:inline-block;width:16px;height:16px;border-radius:50%;background:#eef1f4;color:var(--muted);
+    font-size:11px;text-align:center;line-height:16px;cursor:default;font-weight:600;vertical-align:middle}
   /* downloads */
   .downloads{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
   .downloads a{font-size:13px;text-decoration:none;padding:9px 15px;border:1px solid var(--line);border-radius:9px;
@@ -127,7 +129,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div class="hicon">🧭</div>
+  <div class="hicon">⛵</div>
   <div class="htext">
     <h1>Engelandvaarders in cijfers</h1>
     <div class="subtitle">Analyse van 2.101 dossiers · index Engelandvaarders · Nationaal Archief · 1940–1945</div>
@@ -149,9 +151,9 @@
         <div class="toggle" id="vtoggle"><button data-m="jaar" class="on">Per jaar</button><button data-m="maand">Per maand</button></div></div>
       <div class="yearchart" id="yearchart"></div><div class="legend" id="ylegend"></div></div>
     <div class="card w4"><h2>Hoofdroute</h2><div class="sub">welke weg naar Engeland</div><div class="bars" id="routechart"></div></div>
-    <div class="card w6"><h2>Land van vertrek</h2><div class="sub">aandeel per land van vertrek</div><div class="bars" id="landchart"></div></div>
+    <div class="card w6"><h2>Land van vertrek</h2><div class="sub">vanwaar de reis begon</div><div class="bars" id="landchart"></div></div>
     <div class="card w6"><h2>Leeftijd bij vertrek</h2><div class="sub">per leeftijdsjaar, berekend uit geboorte- en vertrekjaar</div><div class="vchart" id="leeftijdchart"></div></div>
-    <div class="card w6"><h2>Meest genoemde beroepen</h2><div class="sub">top 15 · militaire rangen samengevoegd</div><div class="bars" id="beroepchart"></div></div>
+    <div class="card w6"><h2>Meest genoemde beroepen <span class="qmark" data-tip="Militaire rangen (luitenant, sergeant, marinier, adelborst, cadet, …) zijn samengevoegd tot ‘militair’. Koopvaardij en visserij blijven apart.">?</span></h2><div class="sub">top 15 · beroep bij vertrek</div><div class="bars" id="beroepchart"></div></div>
     <div class="card w6"><h2>Godsdienst</h2><div class="sub">opgegeven geloof, samengevoegd</div><div class="bars" id="godschart"></div></div>
     <div class="card w6"><h2>Reisduur</h2><div class="sub">tijd tussen vertrek en aankomst in Engeland</div><div class="bars" id="duurchart"></div></div>
     <div class="card w6">
@@ -159,16 +161,7 @@
         <div class="toggle" id="ptoggle"><button data-m="plaats" class="on">Plaatsen</button><button data-m="land">Landen</button></div></div>
       <div class="bars" id="plaatschart"></div></div>
   </div>
-  <div class="card">
-    <h2>Gegevens downloaden</h2>
-    <div class="sub">de bewerkte dataset achter deze kaart, vrij te gebruiken</div>
-    <div class="downloads">
-      <a href="engelandvaarders.csv" download>⬇ CSV</a>
-      <a href="people.json?v=3" download="engelandvaarders.json">⬇ JSON</a>
-      <a id="ghlink" href="https://github.com/mossalan-dot" target="_blank" rel="noopener">↗ Broncode op GitHub</a>
-    </div>
-  </div>
-  <p class="note">Bron: Nationaal Archief, index Engelandvaarders 1940–1945. Percentages afgerond; niet elk veld is bij ieder dossier ingevuld.</p>
+  <p class="note">Bron: Nationaal Archief, index Engelandvaarders 1940–1945. Percentages afgerond; niet elk veld is bij ieder dossier ingevuld. Gegevens downloaden en broncode: zie <a href="over.html" style="color:var(--accent)">Over</a>.</p>
 </main>
 <div id="viztip"></div>
 
@@ -208,9 +201,9 @@ function build(P){
   const rc={}; P.forEach(p=>{const r=p.hoofdroute||'onbekend'; rc[r]=(rc[r]||0)+1;});
   bars('routechart', ROUTE_ORDER.filter(r=>rc[r]).map(r=>[r,rc[r],RC[r]]), N);
 
-  // Land van vertrek — percentages
+  // Land van vertrek — absolute aantallen
   const lc={}; P.forEach(p=>{const l=p.land_vertrek||'onbekend'; lc[l]=(lc[l]||0)+1;});
-  bars('landchart', topN(lc,8), N, true);
+  bars('landchart', topN(lc,8), N);
 
   // Leeftijd bij vertrek — per leeftijdsjaar (verticaal)
   const ageCount={}; agesAll.forEach(a=>ageCount[a]=(ageCount[a]||0)+1);
@@ -231,7 +224,7 @@ function build(P){
   let gE=Object.entries(gc).sort((a,b)=>b[1].n-a[1].n);
   const onb=gE.filter(([k])=>k==='onbekend'); gE=gE.filter(([k])=>k!=='onbekend');
   const gtop=gE.slice(0,9).concat(onb).map(([k,v])=>{
-    const col=/isra|jood/.test(k)?'var(--joods)':(k==='onbekend'?'var(--muted)':'var(--accent)');
+    const col=k==='onbekend'?'var(--muted)':'var(--accent)';
     const note=/isra/.test(k)?"Israëliet — de destijds gangbare aanduiding voor het joodse geloof.":null;
     return [v.label, v.n, col, note];});
   bars('godschart', gtop, P.filter(p=>p.godsdienst).length);
@@ -243,7 +236,6 @@ function build(P){
   bars('duurchart', dbins.map(([lab,lo,hi])=>[lab, durs.filter(x=>x>=lo&&x<hi).length, 'var(--accent)']), durs.length, true);
 
   setupPlaats(P, metroute);
-  setupDownloads(P);
   bindTips();
 }
 let DATA=[];
@@ -304,20 +296,19 @@ function drawPlaats(P, metroute){
   document.getElementById('plaatstitel').textContent=pMode==='plaats'?'Meest aangedane plaatsen':'Meest aangedane landen';
   document.getElementById('plaatssub').textContent=pMode==='plaats'?'top 20 · uit de gedetailleerde routes':'aantal reizen dat door elk land liep';
   if(pMode==='plaats'){
-    const pc={}; P.forEach(p=>{ if(!p.heeft_route)return; p.route.forEach(s=>{ if(s.place){const d=s.country?`${s.place} (${s.country})`:s.place; pc[d]=(pc[d]||0)+1;}});});
+    const abbr=c=>c==='Verenigd Koninkrijk'?'VK':(c==='Verenigde Staten'?'VS':c);
+    const pc={}; P.forEach(p=>{ if(!p.heeft_route)return; p.route.forEach(s=>{ if(s.place){const d=s.country?`${s.place} (${abbr(s.country)})`:s.place; pc[d]=(pc[d]||0)+1;}});});
     bars('plaatschart', topN(pc,20).map(([l,n])=>[l,n]), metroute);
   } else {
-    const cc={}; P.forEach(p=>{ if(!p.heeft_route)return; const set=new Set(); p.route.forEach(s=>{ if(s.country)set.add(s.country);}); set.forEach(c=>cc[c]=(cc[c]||0)+1);});
-    bars('plaatschart', topN(cc,20), metroute, true);
+    const cc={}; P.forEach(p=>{ if(!p.heeft_route)return; const set=new Set(); p.route.forEach(s=>{ const c=normCountry(s.country); if(c)set.add(c);}); set.forEach(c=>cc[c]=(cc[c]||0)+1);});
+    bars('plaatschart', topN(cc,20), metroute);
   }
 }
-function setupDownloads(P){
-  const cols=['id','naam','geslacht','geboortejaar','geboorteplaats','woonplaats','beroep','godsdienst','land_vertrek','datumvertr','datumaank','hoofdroute','landen_op_route','record_link'];
-  const q=v=>{v=(v==null?'':String(v)); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
-  const csv=[cols.join(',')].concat(P.map(p=>cols.map(c=>q(p[c])).join(','))).join('\n');
-  const a=document.querySelector('.downloads a[download="engelandvaarders.csv"]')||document.querySelector('.downloads a[href="engelandvaarders.csv"]');
-  if(a){ a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'})); a.setAttribute('download','engelandvaarders.csv'); }
-}
+const CFIX={'verenigd koninkrijk':'Verenigd Koninkrijk','belgïe':'België','belgie':'België','frankrij':'Frankrijk',
+  'new york':'Verenigde Staten','casablanca':'Marokko','noord-afrika':'','tschjechoslowakije':'Tsjechoslowakije',
+  'tegenwoordig: most in tsjechië':'Tsjechoslowakije','zweden -verenigd koninkrijk':'Zweden'};
+function normCountry(c){ if(!c)return''; c=c.trim(); if(c.includes(','))c=c.split(',').pop().trim();
+  const f=CFIX[c.toLowerCase()]; return f!==undefined?f:c; }
 function bindTips(){
   const tip=document.getElementById('viztip');
   document.querySelectorAll('[data-tip]').forEach(el=>{
