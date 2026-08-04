@@ -115,7 +115,7 @@
   .find .fcontent{flex:1;min-width:0}
   .find .tag{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--accent);font-weight:600}
   .find h3{margin:4px 0 8px;font-size:18px;line-height:1.25}
-  .find p{margin:0 0 12px;font-size:14px;color:#374151;line-height:1.55;max-width:72ch}
+  .find p{margin:0 0 12px;font-size:14px;color:#374151;line-height:1.55}
   .find .meta{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;margin-bottom:12px}
   .find .flinks{display:flex;flex-wrap:wrap;gap:7px}
   .find .flinks a{font-size:12px;text-decoration:none;padding:5px 11px;border-radius:20px;
@@ -149,18 +149,17 @@
   </section>
   <div class="grid">
     <div class="card w8">
-      <div class="cardhead"><div><h2>Vertrek in de tijd</h2><div class="sub">aantal vertrekken, gestapeld naar hoofdroute — klik de legenda om routes te tonen/verbergen</div></div>
+      <div class="cardhead"><div><h2>Vertrek in de tijd <span class="qmark" data-tip="De grootste golf valt in het voorjaar en de zomer van 1943: na de Duitse maatregelen van april 1943 — de loyaliteitsverklaring voor studenten, het opnieuw in krijgsgevangenschap voeren van oud-militairen en de uitbreiding van de arbeidsinzet — sloegen veel jonge mannen op de vlucht. Een eerdere, kleinere piek is mei 1940, direct na de Duitse inval. In de wintermaanden lag het aantal vertrekken telkens lager.">?</span></h2><div class="sub">aantal vertrekken, gestapeld naar hoofdroute — klik de legenda om routes te tonen/verbergen</div></div>
         <div class="toggle" id="vtoggle"><button data-m="jaar" class="on">Per jaar</button><button data-m="maand">Per maand</button></div></div>
-      <div class="yearchart" id="yearchart"></div><div class="legend" id="ylegend"></div>
-      <div class="vnote">De grootste golf valt in het <b>voorjaar en de zomer van 1943</b>: na de Duitse maatregelen van april 1943 — de loyaliteitsverklaring voor studenten, het opnieuw in krijgsgevangenschap voeren van oud-militairen en de uitbreiding van de arbeidsinzet — sloegen veel jonge mannen op de vlucht. Een eerdere, kleinere piek is <b>mei 1940</b>, direct na de Duitse inval, met overtochten over de Noordzee. In de wintermaanden lag het aantal vertrekken telkens lager.</div></div>
+      <div class="yearchart" id="yearchart"></div><div class="legend" id="ylegend"></div></div>
     <div class="card w4"><h2>Hoofdroute</h2><div class="sub">welke weg naar Engeland</div><div class="bars" id="routechart"></div></div>
-    <div class="card w6"><h2>Land van vertrek</h2><div class="sub">vanwaar de reis begon</div><div class="bars" id="landchart"></div></div>
+    <div class="card w6"><h2>Land van vertrek <span class="qmark" data-tip="Verreweg de meeste Engelandvaarders vertrokken vanuit Nederland (1.993). Om de overige landen zichtbaar te maken is Nederland hier weggelaten.">?</span></h2><div class="sub">overige landen van vertrek — Nederland (1.993) weggelaten</div><div class="bars" id="landchart"></div></div>
     <div class="card w6">
       <div class="cardhead"><div><h2 id="herktitel">Herkomst — steden</h2><div class="sub" id="herksub">top 15 · woonplaats bij vertrek</div></div>
         <div class="toggle" id="htoggle"><button data-m="stad" class="on">Stad</button><button data-m="prov">Provincie</button></div></div>
       <div class="bars" id="herkchart"></div></div>
     <div class="card w6"><h2>Leeftijd bij vertrek</h2><div class="sub">per leeftijdsjaar, berekend uit geboorte- en vertrekjaar</div><div class="vchart" id="leeftijdchart"></div></div>
-    <div class="card w6"><h2>Meest genoemde beroepen <span class="qmark" data-tip="Militaire rangen (luitenant, sergeant, marinier, adelborst, cadet, …) zijn samengevoegd tot ‘militair’. Koopvaardij en visserij blijven apart.">?</span></h2><div class="sub">top 15 · beroep bij vertrek</div><div class="bars" id="beroepchart"></div></div>
+    <div class="card w6"><h2>Meest genoemde beroepen <span class="qmark" data-tip="Militaire rangen (luitenant, sergeant, marinier, adelborst, cadet, …) zijn samengevoegd tot ‘militair’; koopvaardij en visserij blijven apart. Sommigen gaven meerdere beroepen op (in de bron gescheiden door een puntkomma); elk beroep telt apart mee.">?</span></h2><div class="sub">top 15 · beroep bij vertrek</div><div class="bars" id="beroepchart"></div></div>
     <div class="card w6"><h2>Godsdienst</h2><div class="sub">opgegeven geloof, samengevoegd</div><div class="bars" id="godschart"></div></div>
     <div class="card w6"><h2>Reisduur</h2><div class="sub">tijd tussen vertrek en aankomst in Engeland</div><div class="bars" id="duurchart"></div></div>
     <div class="card w6">
@@ -180,6 +179,8 @@ const ROUTE_ORDER=Object.keys(RC);
 const PALETTE=['#0e7490','#2f6fb0','#8156b8','#1f9e8f','#d67a2e','#4f9d4f','#be123c','#0891b2','#7c3aed','#b45309','#0d9488','#6366f1'];
 const cap=s=>s?s.charAt(0).toUpperCase()+s.slice(1):s;
 const esc=s=>(s||"").replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const med=arr=>{ if(!arr.length)return 0; const s=[...arr].sort((a,b)=>a-b),m=s.length>>1; return s.length%2?s[m]:Math.round((s[m-1]+s[m])/2); };
+function setSub(chartId, text){ const c=document.getElementById(chartId).closest('.card'); const s=c.querySelector('.sub'); if(s) s.textContent=text; }
 
 fetch('people.json?v=4').then(r=>r.json()).then(build);
 
@@ -188,8 +189,10 @@ function build(P){
   const N=P.length;
   const vrouw=P.filter(p=>p.geslacht==='vrouw').length;
   const metroute=P.filter(p=>p.heeft_route).length;
-  const yc={}; P.forEach(p=>{const y=(p.datumvertr||'').slice(0,4); if(/^19[0-9]{2}$/.test(y)) yc[y]=(yc[y]||0)+1;});
-  const piek=Object.entries(yc).sort((a,b)=>b[1]-a[1])[0];
+  const MND=['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
+  const mcnt={}; P.forEach(p=>{const m=(p.datumvertr||'').slice(0,7); if(/^\d{4}-\d{2}$/.test(m)) mcnt[m]=(mcnt[m]||0)+1;});
+  const piekM=Object.entries(mcnt).sort((a,b)=>b[1]-a[1])[0];
+  const piekLabel=piekM?`${MND[+piekM[0].slice(5)-1]} ${piekM[0].slice(0,4)}`:'–';
   const agesAll=[]; P.forEach(p=>{const gy=+p.geboortejaar, vy=+(p.datumvertr||'').slice(0,4);
     if(gy>1850&&vy>1939){const a=vy-gy; if(a>=10&&a<=80) agesAll.push(a);}});
   const gemL=agesAll.length?Math.round(agesAll.reduce((a,b)=>a+b,0)/agesAll.length):'–';
@@ -198,31 +201,36 @@ function build(P){
     [N.toLocaleString('nl'),"Engelandvaarders","in de index"],
     [pct(metroute,N),"met gedetailleerde reisroute",`${metroute.toLocaleString('nl')} van ${N.toLocaleString('nl')}`,
       "Bij deze personen legt de index de volledige reeks tussenstops vast. Bij de overige is alleen begin- en eindpunt bekend."],
-    [piek?piek[0]:'–',"piekjaar van vertrek",piek?`${piek[1]} vertrokken`:''],
+    [piekLabel,"drukste vertrekmaand",piekM?`${piekM[1]} vertrokken`:''],
     [gemL+" jr","gemiddelde leeftijd","bij vertrek"],
     [vrouw,"vrouwen",`${pct(vrouw,N)} van het totaal`],
   ]);
   renderFinds(P);
   setupVertrek(P);
+  setSub('yearchart', `gestapeld naar hoofdroute · klik de legenda om te filteren · n = ${Object.values(mcnt).reduce((a,b)=>a+b,0).toLocaleString('nl')}`);
 
   // Hoofdroute
   const rc={}; P.forEach(p=>{const r=p.hoofdroute||'onbekend'; rc[r]=(rc[r]||0)+1;});
   bars('routechart', ROUTE_ORDER.filter(r=>rc[r]).map(r=>[r,rc[r],RC[r]]), N);
+  setSub('routechart', `welke weg naar Engeland · n = ${N.toLocaleString('nl')}`);
 
-  // Land van vertrek — absolute aantallen
-  const lc={}; P.forEach(p=>{const l=p.land_vertrek||'onbekend'; lc[l]=(lc[l]||0)+1;});
+  // Land van vertrek — Nederland weggelaten (dwarsboomt de rest)
+  const lc={}; P.forEach(p=>{const l=p.land_vertrek||'onbekend'; if(l==='Nederland')return; lc[l]=(lc[l]||0)+1;});
   bars('landchart', topN(lc,8), N);
+  setSub('landchart', `overige landen — Nederland (1.993) weggelaten · n = ${N.toLocaleString('nl')}`);
 
   // Leeftijd bij vertrek — per leeftijdsjaar (verticaal)
   const ageCount={}; agesAll.forEach(a=>ageCount[a]=(ageCount[a]||0)+1);
   const amin=Math.min(...agesAll), amax=Math.max(...agesAll), ageRows=[];
   for(let a=amin;a<=amax;a++) ageRows.push([a, ageCount[a]||0, (a%5===0?String(a):''), `<b>${a} jaar</b><br>${ageCount[a]||0} personen`]);
   vbars('leeftijdchart', ageRows);
+  setSub('leeftijdchart', `per leeftijdsjaar · mediaan ${med(agesAll)}, gemiddeld ${gemL} jaar · n = ${agesAll.length.toLocaleString('nl')}`);
 
   // Beroepen — militaire rangen samengevoegd tot 'militair'
   const bc={}; P.forEach(p=>{ (p.beroep||'').split(';').forEach(t=>{let k=t.trim().toLowerCase();
     if(!k)return; if(isMilitair(k)) k='militair'; bc[k]=(bc[k]||0)+1;});});
   bars('beroepchart', topN(bc,15).map(([l,n])=>[cap(l),n]), N);
+  setSub('beroepchart', `top 15 · beroep bij vertrek · n = ${P.filter(p=>p.beroep&&p.beroep.trim()).length.toLocaleString('nl')}`);
 
   // Godsdienst — 'geen'→onbekend (onderaan), Israëliet-spelling + toelichting
   const gc={}; P.forEach(p=>{let g=(p.godsdienst||'').trim(); if(!g)return;
@@ -235,13 +243,17 @@ function build(P){
     const col=k==='onbekend'?'var(--muted)':undefined;
     const note=/isra/.test(k)?"Israëliet — de destijds gangbare aanduiding voor het joodse geloof.":null;
     return [v.label, v.n, col, note];});
-  bars('godschart', gtop, P.filter(p=>p.godsdienst).length);
+  const nGods=P.filter(p=>p.godsdienst&&p.godsdienst.trim()).length;
+  bars('godschart', gtop, nGods);
+  setSub('godschart', `opgegeven geloof, samengevoegd · n = ${nGods.toLocaleString('nl')}`);
 
   // Reisduur
   const durs=[]; P.forEach(p=>{const d1=pd(p.datumvertr), d2=pd(p.datumaank);
     if(d1&&d2){const days=(d2-d1)/864e5; if(days>=0&&days<2000) durs.push(days);}});
   const dbins=[["< 1 maand",0,30],["1–3 mnd",30,91],["3–6 mnd",91,182],["6–12 mnd",182,365],["1–2 jaar",365,730],["> 2 jaar",730,1e9]];
   bars('duurchart', dbins.map(([lab,lo,hi])=>[lab, durs.filter(x=>x>=lo&&x<hi).length, 'var(--accent)']), durs.length, true);
+  const meanDur=durs.length?Math.round(durs.reduce((a,b)=>a+b,0)/durs.length):0;
+  setSub('duurchart', `vertrek→aankomst · mediaan ${med(durs)}, gemiddeld ${meanDur} dagen · n = ${durs.length.toLocaleString('nl')}`);
 
   setupPlaats(P, metroute);
   setupHerkomst(P);
@@ -262,8 +274,7 @@ const PROV={
 };
 function provinceOf(wp){
   if(!wp) return '';
-  const m=/\(([^)]+)\)/.exec(wp);
-  if(m){ const c=m[1].toLowerCase(); if(c.includes('belg'))return 'België'; if(c.includes('frank'))return 'Frankrijk'; if(c.includes('duits'))return 'Duitsland'; return 'buitenland'; }
+  if(/\(([^)]+)\)/.test(wp)) return 'buitenland';   // "Antwerpen (België)", "Parijs (Frankrijk)" enz.
   return PROV[wp.toLowerCase().trim()]||'overig / onbekend';
 }
 let hMode='stad';
@@ -275,7 +286,7 @@ function setupHerkomst(P){
 function drawHerkomst(P){
   const denom=P.filter(p=>p.woonplaats && p.woonplaats.trim()).length;
   document.getElementById('herktitel').textContent = hMode==='stad'?'Herkomst — steden':'Herkomst — provincies';
-  document.getElementById('herksub').textContent = hMode==='stad'?'top 15 · woonplaats bij vertrek':'woonplaats naar provincie';
+  document.getElementById('herksub').textContent = (hMode==='stad'?'top 15 · woonplaats bij vertrek':'woonplaats naar provincie')+` · n = ${denom.toLocaleString('nl')}`;
   if(hMode==='stad'){
     const c={}; P.forEach(p=>{ const w=(p.woonplaats||'').trim(); if(w)c[w]=(c[w]||0)+1; });
     bars('herkchart', topN(c,15), denom);
@@ -343,7 +354,7 @@ function setupPlaats(P, metroute){
 }
 function drawPlaats(P, metroute){
   document.getElementById('plaatstitel').textContent=pMode==='plaats'?'Meest aangedane plaatsen':'Meest aangedane landen';
-  document.getElementById('plaatssub').textContent=pMode==='plaats'?'top 20 · uit de gedetailleerde routes':'aantal reizen dat door elk land liep';
+  document.getElementById('plaatssub').textContent=(pMode==='plaats'?'top 20 · uit de gedetailleerde routes':'aantal reizen dat door elk land liep')+` · n = ${metroute.toLocaleString('nl')}`;
   if(pMode==='plaats'){
     const abbr=c=>c==='Verenigd Koninkrijk'?'VK':(c==='Verenigde Staten'?'VS':c);
     const pc={}; P.forEach(p=>{ if(!p.heeft_route)return; p.route.forEach(s=>{ if(s.place){const d=s.country?`${s.place} (${abbr(s.country)})`:s.place; pc[d]=(pc[d]||0)+1;}});});
